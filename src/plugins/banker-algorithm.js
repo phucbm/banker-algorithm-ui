@@ -1,6 +1,6 @@
 export class Banker{
     constructor(input){
-        this.log = {
+        this.logPermission = {
             calc: true,
             result: true,
             process: true
@@ -17,24 +17,41 @@ export class Banker{
         this.resourceCount = this.allocation[0].length; // n
         this.need = this.computeNeedMatrix();
 
+        this.logs = [];
         this.printInput();
     }
+
+    log(category, type, string){
+        switch(category){
+            case 'process':
+                if(this.logPermission.process) console.log(string);
+                break;
+            case 'result':
+                if(this.logPermission.result) console.log(string);
+                break;
+            case 'calc':
+                if(this.logPermission.calc) console.log(string);
+                break;
+        }
+        this.logs.push({category, type, string});
+    }
+
 
     request(p_index, p_request){
         const available = [...this.available];
         const p_need = this.need[p_index];
 
-        if(this.log.process) console.log(`P${p_index + 1} requests [${p_request.join(',')}]`);
+        this.log('process', 'info', `P${p_index + 1} requests [${p_request.join(',')}]`);
 
         // request <= need
         if(!this.isVectorALessThanOrEqualToB(p_request, p_need)){
-            if(this.log.result) console.warn(`Request rejected! [${p_request.join(',')}] asks more than it needs [${p_need.join(',')}]`);
+            this.log('result', 'error', `Request rejected! [${p_request.join(',')}] asks more than it needs [${p_need.join(',')}]`);
             return false;
         }
 
         // request <= available
         if(!this.isVectorALessThanOrEqualToB(p_request, available)){
-            if(this.log.result) console.warn('Request ON HOLD due to system is not available.');
+            this.log('result', 'warning', 'Request ON HOLD due to system is not available.');
             return false;
         }
 
@@ -53,12 +70,12 @@ export class Banker{
 
         // system is not safe
         if(!isSystemSafe){
-            if(this.log.result) console.warn('Request ON HOLD due to system unsafe.');
+            this.log('result', 'warning', 'Request ON HOLD due to system unsafe.');
             return false;
         }
 
         // allocate resource
-        if(this.log.result) console.log('Request is being processed...');
+        this.log('result', 'success', 'Request is being processed...');
         // todo: allocate resource
     }
 
@@ -82,9 +99,15 @@ export class Banker{
             // step 2: find process
             let check = 0;
             for(let i = 0; i < available.length; i++){
-                if(!finish[i] && this.isVectorALessThanOrEqualToB(need[i], available)){
+                const ok = this.isVectorALessThanOrEqualToB(need[i], available);
+
+                this.log('calc', ok ? 'info' : 'warning', `P${i + 1}: So sánh Need [${need[i].join(',')}] <= Available: [${available.join(',')}]? => ${ok}`);
+
+                if(!finish[i] && ok){
                     // step 3: update work
-                    available = this.sumVector(available, allocation[i]);
+                    const result = this.sumVector(available, allocation[i]);
+                    this.log('calc', 'info', `P${i + 1}: Cập nhật Available += Allocation => [${available.join(',')}] + [${allocation[i].join(',')}] = [${result.join(',')}]`);
+                    available = result;
                     finish[i] = true;
                     break; // break loop and move to step 2
                 }
@@ -104,7 +127,8 @@ export class Banker{
             }
         }
         while(!isAllFinished() && !unsafeDetected);
-        if(this.log.result) console.log('Is system safe?', isAllFinished(), finish);
+
+        this.log('result', 'info', `Hệ thống an toàn? => ${isAllFinished() ? 'Yes' : 'No'}`);
 
         return isAllFinished();
     }
@@ -114,7 +138,7 @@ export class Banker{
         for(let i = 0; i < a.length; i++){
             result.push(a[i] - b[i]);
         }
-        if(this.log.calc) console.log('Minus:', a.join(','), '-', b.join(','), '=', result.join(','))
+        this.log('calc', 'info', `[${a.join(',')}] - [${b.join(',')}] = [${result.join(',')}]`);
         return result;
     }
 
@@ -123,7 +147,6 @@ export class Banker{
         for(let i = 0; i < a.length; i++){
             result.push(a[i] + b[i]);
         }
-        if(this.log.calc) console.log('Sum:', a.join(','), '+', b.join(','), '=', result.join(','))
         return result;
     }
 
@@ -135,7 +158,6 @@ export class Banker{
                 break;
             }
         }
-        if(this.log.calc) console.log('Compare:', a.join(','), '<=', b.join(','), result);
         return result;
     }
 
@@ -154,7 +176,7 @@ export class Banker{
     }
 
     printInput(){
-        if(!this.log.result) return;
+        if(!this.logPermission.result) return;
 
         console.log('---> Allocation')
         console.table(this.allocation);
