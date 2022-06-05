@@ -3,15 +3,14 @@
 
     <v-app-bar app>
       <v-app-bar-title>Banker Algorithm UI</v-app-bar-title>
-      <!--      <v-btn-group>-->
-      <!--        <v-btn color="primary" variant="outlined">-->
-      <!--          Thêm Tiến Trình-->
-      <!--        </v-btn>-->
-
-      <!--        <v-btn color="primary" variant="outlined">-->
-      <!--          Thêm Tài Nguyên-->
-      <!--        </v-btn>-->
-      <!--      </v-btn-group>-->
+      <v-btn-group divided="">
+        <v-btn color="primary" variant="outlined" v-on:click="checkSystemSafe">
+          Kiểm Tra Hệ Thống
+        </v-btn>
+        <v-btn color="red" variant="outlined" v-on:click="deleteLocalStorage">
+          Xoá bộ nhớ
+        </v-btn>
+      </v-btn-group>
     </v-app-bar>
 
     <!-- Sizes your content based upon application components -->
@@ -40,7 +39,6 @@
                       required
                       type="number"
                       Min="0"
-                      v-on:keyup="updateTables"
                   ></v-text-field>
                 </v-col>
 
@@ -56,8 +54,16 @@
                       required
                       type="number"
                       Min="0"
-                      v-on:keyup="updateTables"
                   ></v-text-field>
+                </v-col>
+
+                <v-col
+                    cols="12"
+                    md="3"
+                >
+                  <v-btn color="green" variant="outlined" v-on:click="updateTables(true)" height="55">
+                    Cập nhật
+                  </v-btn>
                 </v-col>
 
               </v-row>
@@ -117,10 +123,27 @@
           </v-col>
 
           <v-col
+              v-if="showNeed"
               cols="12"
               md="3"
           >
             <h2>Need</h2>
+            <v-table>
+              <thead>
+              <tr>
+                <th class="text-left" v-for="(resource,index) in data.need[0]" :key="index">
+                  R{{ index + 1 }}
+                </th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr v-for="(process,i) in data.need" :key="i">
+                <td v-for="(resource,j) in process" :key="j">
+                  <div>{{ resource }}</div>
+                </td>
+              </tr>
+              </tbody>
+            </v-table>
           </v-col>
 
           <v-col
@@ -175,15 +198,45 @@ export default {
       resourceCountRules: [
         v => v >= 2 || 'Nhập ít nhất 2 tài nguyên.'
       ],
+      showNeed: false,
+      hasLocalData: false,
       data: {
         max: [],
         allocation: [],
-        need: [],
         available: []
       }
     }
   },
   methods: {
+    deleteLocalStorage(){
+      console.log('deleteLocalStorage')
+      localStorage.removeItem("banker-algorithm-ui");
+    },
+    loadLocalData(){
+      const data = JSON.parse(localStorage.getItem("banker-algorithm-ui"));
+
+      if(!data) return;
+
+      console.log(data)
+
+      if(data.processCount) this.processCount = data.processCount;
+      if(data.resourceCount) this.resourceCount = data.resourceCount;
+
+      if(!data.data) return;
+      if(data.data.max) this.data.max = this.parseArray(data.data.max);
+      if(data.data.allocation) this.data.allocation = this.parseArray(data.data.allocation);
+      if(data.data.available) this.data.available = this.parseArray(data.data.available);
+
+      this.hasLocalData = true;
+    },
+    saveLocalData(){
+      const data = {
+        processCount: this.processCount,
+        resourceCount: this.resourceCount,
+        data: this.data
+      };
+      localStorage.setItem("banker-algorithm-ui", JSON.stringify(data));
+    },
     updateData(){
       // update Max table
       const max = [];
@@ -213,51 +266,76 @@ export default {
         available.push(parseInt(r.value));
       });
       this.data.available = [...available];
+
+      // save data
+      this.saveLocalData();
     },
-    updateTables(){
-      const emptyMatrix = [];
-      for(let i = 0; i < this.processCount; i++){
-        const process = [];
-        for(let j = 0; j < this.resourceCount; j++){
-          process.push(0);
+    updateTables(reset = false){
+      console.log('reset', reset)
+      if(!reset){
+        const allocationMatrix = [], maxMatrix = [];
+        for(let i = 0; i < this.processCount; i++){
+          const p_allocation = [];
+          const p_max = [];
+          for(let j = 0; j < this.resourceCount; j++){
+            const max_val = this.hasLocalData ? this.data.max[i][j] : 0;
+            const allocation_val = this.hasLocalData ? this.data.allocation[i][j] : 0;
+
+            p_max.push(max_val);
+            p_allocation.push(allocation_val);
+          }
+          allocationMatrix.push(p_allocation);
+          maxMatrix.push(p_max);
         }
-        emptyMatrix.push(process);
+        this.data.max = [...maxMatrix];
+        this.data.allocation = [...allocationMatrix];
+      }else{
+        const emptyMatrix = [];
+        for(let i = 0; i < this.processCount; i++){
+          const process = [];
+          for(let j = 0; j < this.resourceCount; j++){
+            process.push(0);
+          }
+          emptyMatrix.push(process);
+        }
+        this.data.max = [...emptyMatrix];
+        this.data.allocation = [...emptyMatrix];
       }
-      this.data.max = [...emptyMatrix];
-      this.data.allocation = [...emptyMatrix];
-      this.data.need = [...emptyMatrix];
 
       const available = [];
-      for(let j = 0; j < this.resourceCount; j++){
-        available.push(0);
+      for(let i = 0; i < this.resourceCount; i++){
+        available.push(this.hasLocalData ? this.data.available[i] : 0);
       }
       this.data.available = [...available];
+
+      // save data
+      this.saveLocalData();
+    },
+    parseArray(object){
+      const array = [];
+      for(const [key, value] of Object.entries(object)){
+        if(typeof value === 'object'){
+          array.push(this.parseArray(value));
+        }else{
+          array.push(value);
+        }
+      }
+      return array;
+    },
+    checkSystemSafe(){
+      const input = {
+        allocation: this.parseArray(this.data.allocation),
+        max: this.parseArray(this.data.max),
+        available: this.parseArray(this.data.available)
+      };
+
+      const systems = new Banker(input);
+      console.log(systems.isSystemSafe())
     }
   },
   mounted(){
+    this.loadLocalData();
     this.updateTables();
-
-    const a = {
-      allocation: [
-        [0, 0, 1, 2],
-        [1, 0, 0, 0],
-        [1, 3, 5, 4],
-        [0, 6, 3, 2],
-        [0, 0, 1, 4]
-      ],
-      max: [
-        [0, 0, 1, 2],
-        [1, 7, 5, 0],
-        [2, 3, 5, 6],
-        [0, 6, 5, 2],
-        [0, 6, 5, 6]
-      ],
-      available: [1, 5, 2, 0]
-    };
-
-    //const systems = new Banker(a);
-    //console.log(systems.isSystemSafe())
-    //systems.request(1, [0, 4, 2, 0]);
   }
 }
 </script>
