@@ -1,4 +1,4 @@
-# rwv3
+# Banker Algorithm UI
 
 ## Project setup
 ```
