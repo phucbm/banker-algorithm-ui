@@ -128,6 +128,23 @@
               md="3"
           >
             <h2>Work (Available)</h2>
+            <v-table>
+              <thead>
+              <tr>
+                <th class="text-left" v-for="(resource,index) in data.allocation[0]" :key="index">
+                  R{{ index + 1 }}
+                </th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr>
+                <td v-for="(resource,i) in data.available" :key="i">
+                  <input data-available type="number" :value="resource" style="width:50px"
+                         v-on:change="updateData">
+                </td>
+              </tr>
+              </tbody>
+            </v-table>
           </v-col>
 
         </v-row>
@@ -190,7 +207,12 @@ export default {
       });
       this.data.allocation = {...allocation};
 
-      console.log(this.data)
+      // update Available
+      const available = [];
+      document.querySelectorAll('[data-available]').forEach(r => {
+        available.push(parseInt(r.value));
+      });
+      this.data.available = [...available];
     },
     updateTables(){
       const emptyMatrix = [];
@@ -204,6 +226,12 @@ export default {
       this.data.max = [...emptyMatrix];
       this.data.allocation = [...emptyMatrix];
       this.data.need = [...emptyMatrix];
+
+      const available = [];
+      for(let j = 0; j < this.resourceCount; j++){
+        available.push(0);
+      }
+      this.data.available = [...available];
     }
   },
   mounted(){
